@@ -19,32 +19,58 @@ document.body.append(canvas);
 
 // drawing styles
 const ctx = canvas.getContext('2d');
-ctx.strokeStyle = 'black'; // Line color
-ctx.lineWidth = 2; // Line width
+// ctx check to quell null error
+if (!ctx) {
+    throw new Error('Failed to get the canvas context!');
+}
 
 let isDrawing = false; // check mousedown variable
+const lines: number[][][] = []; // number = array of array of array
 // start
 canvas.addEventListener('mousedown', (event) => {
     isDrawing = true;
-    ctx.moveTo(event.offsetX, event.offsetY);
+    const newLine: number[][] = [[event.offsetX, event.offsetY]];
+    lines.push(newLine);
 });
 // draw
 canvas.addEventListener('mousemove', (event) => {
     if (!isDrawing) return;
-    ctx.lineTo(event.offsetX, event.offsetY);
-    ctx.stroke();
+    const currentLine = lines[lines.length - 1];
+    currentLine.push([event.offsetX, event.offsetY]);
+    
+    // dispatch drawing-changed event
+    canvas.dispatchEvent(new CustomEvent('drawing-changed'));
 });
 // stop
 canvas.addEventListener('mouseup', () => {
     isDrawing = false;
-    ctx.beginPath(); // start a new path for next stroke
 });
 
+
+// clear button
 const clearButton = document.createElement('button');
 clearButton.textContent = 'Clear';
 document.body.append(clearButton);
 
-// Clear the canvas when the button is clicked
 clearButton.addEventListener('click', () => {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    lines.length = 0; // clear stored lines
+    ctx.clearRect(0, 0, canvas.width, canvas.height); // clear canvas
+});
+
+// Observer for the "drawing-changed" event
+canvas.addEventListener('drawing-changed', () => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height); // clear
+    // line style
+    ctx.strokeStyle = 'black';
+    ctx.lineWidth = 2;
+
+    // redraw all lines
+    for (const line of lines) {
+        ctx.beginPath();
+        ctx.moveTo(line[0][0], line[0][1]); // move to first point
+        for (const point of line) {
+            ctx.lineTo(point[0], point[1]); // draw to each point
+        }
+        ctx.stroke();
+    }
 });
