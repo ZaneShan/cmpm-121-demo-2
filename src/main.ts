@@ -26,9 +26,11 @@ if (!ctx) {
 
 let isDrawing = false; // check mousedown variable
 const lines: number[][][] = []; // number = array of array of array
+const redoStack: number[][][] = []; // stack for redo operations
 // start
 canvas.addEventListener('mousedown', (event) => {
     isDrawing = true;
+    redoStack.length = 0; // clear stored lines
     const newLine: number[][] = [[event.offsetX, event.offsetY]];
     lines.push(newLine);
 });
@@ -52,9 +54,46 @@ const clearButton = document.createElement('button');
 clearButton.textContent = 'Clear';
 document.body.append(clearButton);
 
+// clear functionality
 clearButton.addEventListener('click', () => {
     lines.length = 0; // clear stored lines
     ctx.clearRect(0, 0, canvas.width, canvas.height); // clear canvas
+});
+
+// undo button
+const undoButton = document.createElement('button');
+undoButton.textContent = 'Undo';
+document.body.appendChild(undoButton);
+
+// Undo functionality
+undoButton.addEventListener('click', () => {
+    if (lines.length > 0) {
+        const lastLine = lines.pop(); // remove the last line
+        if (lastLine) {
+            redoStack.push(lastLine); // add to redo stack
+        }
+        // dispatch drawing-changed event
+        const drawingChangedEvent = new CustomEvent('drawing-changed');
+        canvas.dispatchEvent(drawingChangedEvent);
+    }
+});
+
+// redo button
+const redoButton = document.createElement('button');
+redoButton.textContent = 'Redo';
+document.body.appendChild(redoButton);
+
+// Redo functionality
+redoButton.addEventListener('click', () => {
+    if (redoStack.length > 0) {
+        const lineToRedo = redoStack.pop(); // get last undone line
+        if (lineToRedo) {
+            lines.push(lineToRedo); // add to lines
+        }
+        // dispatch drawing-changed event
+        const drawingChangedEvent = new CustomEvent('drawing-changed');
+        canvas.dispatchEvent(drawingChangedEvent);
+    }
 });
 
 // Observer for the "drawing-changed" event
