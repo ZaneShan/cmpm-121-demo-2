@@ -25,20 +25,49 @@ if (!ctx) {
 }
 
 let isDrawing = false; // check mousedown variable
-const lines: number[][][] = []; // number = array of array of array
-const redoStack: number[][][] = []; // stack for redo operations
+
+class MarkerLine {
+    points: { x: number; y: number }[];
+
+    constructor(x1: number, y1: number) {
+        this.points = [{ x: x1, y: y1 }]; // initial marker position
+    }
+
+    addPoint(x: number, y: number): void {
+        this.points.push({ x, y });
+    }
+
+    display(ctx: CanvasRenderingContext2D): void {
+        ctx.beginPath();
+        ctx.moveTo(this.points[0].x, this.points[0].y);
+        for (const point of this.points) {
+            ctx.lineTo(point.x, point.y);
+        }
+
+        // STYLE //
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 2;
+        //       //
+
+        ctx.stroke();
+    }
+}
+
+const lines: MarkerLine[] = []; // number = array of array of array
+const redoStack: MarkerLine[] = []; // stack for redo operations
+
 // start
 canvas.addEventListener('mousedown', (event) => {
     isDrawing = true;
     redoStack.length = 0; // clear stored lines
-    const newLine: number[][] = [[event.offsetX, event.offsetY]];
+    const newLine = new MarkerLine(event.offsetX, event.offsetY);
     lines.push(newLine);
 });
 // draw
 canvas.addEventListener('mousemove', (event) => {
     if (!isDrawing) return;
     const currentLine = lines[lines.length - 1];
-    currentLine.push([event.offsetX, event.offsetY]);
+    currentLine.addPoint(event.offsetX, event.offsetY);
     
     // dispatch drawing-changed event
     canvas.dispatchEvent(new CustomEvent('drawing-changed'));
@@ -99,17 +128,9 @@ redoButton.addEventListener('click', () => {
 // Observer for the "drawing-changed" event
 canvas.addEventListener('drawing-changed', () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height); // clear
-    // line style
-    ctx.strokeStyle = 'black';
-    ctx.lineWidth = 2;
 
     // redraw all lines
     for (const line of lines) {
-        ctx.beginPath();
-        ctx.moveTo(line[0][0], line[0][1]); // move to first point
-        for (const point of line) {
-            ctx.lineTo(point[0], point[1]); // draw to each point
-        }
-        ctx.stroke();
+        line.display(ctx);
     }
 });
