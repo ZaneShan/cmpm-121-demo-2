@@ -10,7 +10,9 @@ const title = document.createElement('h1');
 title.textContent = 'Sticker Sketchpad';
 document.body.append(title);
 
+
 // CANVAS //
+
 const canvas = document.createElement('canvas');
 canvas.width = 256;
 canvas.height = 256;
@@ -26,6 +28,12 @@ if (!ctx) {
 
 let isDrawing = false; // check mousedown variable
 let lineWidth = 2; // default line width
+type ToolPreview = {
+    thickness: number;
+    x: number;
+    y: number;
+}; // preview object
+let toolPreview: ToolPreview | null = null;
 
 class MarkerLine {
     points: { x: number; y: number }[];
@@ -68,12 +76,18 @@ canvas.addEventListener('mousedown', (event) => {
 });
 // draw
 canvas.addEventListener('mousemove', (event) => {
-    if (!isDrawing) return;
-    const currentLine = lines[lines.length - 1];
-    currentLine.drag(event.offsetX, event.offsetY);
-    
-    // dispatch drawing-changed event
-    canvas.dispatchEvent(new CustomEvent('drawing-changed'));
+    if (isDrawing) {
+        const currentLine = lines[lines.length - 1];
+        currentLine.drag(event.offsetX, event.offsetY);
+        
+        canvas.dispatchEvent(new CustomEvent('drawing-changed'));
+    } 
+    else if (toolPreview != null) {
+        // update tool preview position
+        toolPreview.x = event.offsetX;
+        toolPreview.y = event.offsetY;
+        canvas.dispatchEvent(new CustomEvent('tool-moved'));
+    }
 });
 // stop
 canvas.addEventListener('mouseup', () => {
@@ -128,32 +142,6 @@ redoButton.addEventListener('click', () => {
     }
 });
 
-// tool buttons
-const thinButton = document.createElement('button');
-thinButton.textContent = '.';
-document.body.append(thinButton);
-
-const thickButton = document.createElement('button');
-thickButton.textContent = 'o';
-document.body.append(thickButton);
-
-// set thing to default
-let selectedTool = 'thin';
-thinButton.classList.add('selectedTool');
-
-// tool button functionality
-thinButton.addEventListener('click', () => {
-    selectedTool = 'thin';
-    lineWidth = 2; // Set thin width
-    updateToolSelection();
-});
-
-thickButton.addEventListener('click', () => {
-    selectedTool = 'thick';
-    lineWidth = 5; // Set thick width
-    updateToolSelection();
-});
-
 // helper to update button styles
 function updateToolSelection() {
     thinButton.classList.toggle('selectedTool', selectedTool === 'thin');
@@ -168,4 +156,66 @@ canvas.addEventListener('drawing-changed', () => {
     for (const line of lines) {
         line.display(ctx);
     }
+    if (toolPreview) {
+        drawToolPreview()
+    }
 });
+
+
+// TOOLS //
+
+//create buttons
+const thinButton = document.createElement('button');
+thinButton.textContent = '.';
+document.body.append(thinButton);
+const thickButton = document.createElement('button');
+thickButton.textContent = 'o';
+document.body.append(thickButton);
+
+// set thin to default
+let selectedTool = 'thin';
+thinButton.classList.add('selectedTool');
+toolPreview = { thickness: lineWidth, x: canvas.width / 4, y: canvas.height / 2 };
+
+// tool button functionality
+thinButton.addEventListener('click', () => setTool('thin'));
+thickButton.addEventListener('click', () => setTool('thick'));
+
+function setTool(type: 'thin' | 'thick') {
+    selectedTool = type;
+    // set width
+    switch(type) {
+        case 'thin':
+            lineWidth = 2
+            break;
+        case 'thick':
+            lineWidth = 5
+            break;
+        default:
+            lineWidth = 2
+    }
+    updateToolSelection();
+    // redraw to show updated preview
+    canvas.dispatchEvent(new CustomEvent('drawing-changed'));
+}
+
+// tool-moved event
+canvas.addEventListener('tool-moved', () => {
+    // redraw tool preview
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (const line of lines) {
+        line.display(ctx);
+    }
+    drawToolPreview()
+});
+
+// preview helper function
+function drawToolPreview() {
+    if (toolPreview && ctx) {
+        ctx.beginPath();
+        ctx.arc(toolPreview.x, toolPreview.y, toolPreview.thickness / 4, 0, Math.PI * 2);
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = toolPreview.thickness;
+        ctx.stroke();
+    }
+}
