@@ -1,13 +1,13 @@
 import "./style.css";
 
-const APP_NAME = "Zane";
+const APP_NAME = "Zane Shan";
 const app = document.querySelector<HTMLDivElement>("#app")!;
 
 document.title = APP_NAME;
 app.innerHTML = APP_NAME;
 
 const title = document.createElement('h1');
-title.textContent = 'title';
+title.textContent = 'Sticker Sketchpad';
 document.body.append(title);
 
 // CANVAS //
@@ -25,15 +25,18 @@ if (!ctx) {
 }
 
 let isDrawing = false; // check mousedown variable
+let lineWidth = 2; // default line width
 
 class MarkerLine {
     points: { x: number; y: number }[];
+    thickness: number;
 
-    constructor(x1: number, y1: number) {
+    constructor(x1: number, y1: number, thickness: number) {
         this.points = [{ x: x1, y: y1 }]; // initial marker position
+        this.thickness = thickness; // set thickness
     }
 
-    addPoint(x: number, y: number): void {
+    drag(x: number, y: number): void {
         this.points.push({ x, y });
     }
 
@@ -46,7 +49,7 @@ class MarkerLine {
 
         // STYLE //
         ctx.strokeStyle = 'black';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = this.thickness; // current thickness
         //       //
 
         ctx.stroke();
@@ -60,14 +63,14 @@ const redoStack: MarkerLine[] = []; // stack for redo operations
 canvas.addEventListener('mousedown', (event) => {
     isDrawing = true;
     redoStack.length = 0; // clear stored lines
-    const newLine = new MarkerLine(event.offsetX, event.offsetY);
+    const newLine = new MarkerLine(event.offsetX, event.offsetY, lineWidth);
     lines.push(newLine);
 });
 // draw
 canvas.addEventListener('mousemove', (event) => {
     if (!isDrawing) return;
     const currentLine = lines[lines.length - 1];
-    currentLine.addPoint(event.offsetX, event.offsetY);
+    currentLine.drag(event.offsetX, event.offsetY);
     
     // dispatch drawing-changed event
     canvas.dispatchEvent(new CustomEvent('drawing-changed'));
@@ -94,7 +97,7 @@ const undoButton = document.createElement('button');
 undoButton.textContent = 'Undo';
 document.body.appendChild(undoButton);
 
-// Undo functionality
+// undo functionality
 undoButton.addEventListener('click', () => {
     if (lines.length > 0) {
         const lastLine = lines.pop(); // remove the last line
@@ -112,7 +115,7 @@ const redoButton = document.createElement('button');
 redoButton.textContent = 'Redo';
 document.body.appendChild(redoButton);
 
-// Redo functionality
+// redo functionality
 redoButton.addEventListener('click', () => {
     if (redoStack.length > 0) {
         const lineToRedo = redoStack.pop(); // get last undone line
@@ -124,6 +127,38 @@ redoButton.addEventListener('click', () => {
         canvas.dispatchEvent(drawingChangedEvent);
     }
 });
+
+// tool buttons
+const thinButton = document.createElement('button');
+thinButton.textContent = '.';
+document.body.append(thinButton);
+
+const thickButton = document.createElement('button');
+thickButton.textContent = 'o';
+document.body.append(thickButton);
+
+// set thing to default
+let selectedTool = 'thin';
+thinButton.classList.add('selectedTool');
+
+// tool button functionality
+thinButton.addEventListener('click', () => {
+    selectedTool = 'thin';
+    lineWidth = 2; // Set thin width
+    updateToolSelection();
+});
+
+thickButton.addEventListener('click', () => {
+    selectedTool = 'thick';
+    lineWidth = 5; // Set thick width
+    updateToolSelection();
+});
+
+// helper to update button styles
+function updateToolSelection() {
+    thinButton.classList.toggle('selectedTool', selectedTool === 'thin');
+    thickButton.classList.toggle('selectedTool', selectedTool === 'thick');
+}
 
 // Observer for the "drawing-changed" event
 canvas.addEventListener('drawing-changed', () => {
