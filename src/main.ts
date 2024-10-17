@@ -64,25 +64,68 @@ class MarkerLine {
     }
 }
 
+class Sticker {
+    emoji: string;
+    x: number;
+    y: number;
+
+    constructor(emoji: string, x: number, y: number) {
+        this.emoji = emoji;
+        this.x = x;
+        this.y = y;
+    }
+
+    draw(ctx: CanvasRenderingContext2D) {
+        ctx.font = "30px 'Segoe UI Emoji'";
+        ctx.fillText(this.emoji, this.x, this.y);
+    }
+
+    drag(ctx: CanvasRenderingContext2D, x: number, y: number) {
+        this.x = x - ctx.measureText(this.emoji).width / 2; // Center horizontally
+        this.y = y + 10; // Adjust vertical position if needed
+    }
+}
+
 const lines: MarkerLine[] = []; // number = array of array of array
 const redoStack: MarkerLine[] = []; // stack for redo operations
+const stickers: Sticker[] = []; // stack for redo operations
+let draggingPreview = false;
+
 
 // start
 canvas.addEventListener('mousedown', (event) => {
+    if (selectedTool === null) return;
     isDrawing = true;
     redoStack.length = 0; // clear stored lines
-    const newLine = new MarkerLine(event.offsetX, event.offsetY, lineWidth);
-    lines.push(newLine);
+
+    if (toolPreview && 
+        event.offsetX >= toolPreview.x - (ctx.measureText(selectedTool).width / 2) &&
+        event.offsetX <= toolPreview.x + (ctx.measureText(selectedTool).width / 2) &&
+        event.offsetY >= toolPreview.y - 30 && // adjust based on font size
+        event.offsetY <= toolPreview.y
+    ) {
+        draggingPreview = true; // Start dragging the preview
+    }
+
+    if (selectedTool === 'thin' || selectedTool === 'thick') {
+        const newLine = new MarkerLine(event.offsetX, event.offsetY, lineWidth);
+        lines.push(newLine);
+    }
 });
 // draw
 canvas.addEventListener('mousemove', (event) => {
-    if (isDrawing) {
+    if (isDrawing && (selectedTool === 'thin' || selectedTool === 'thick')) {
         const currentLine = lines[lines.length - 1];
         currentLine.drag(event.offsetX, event.offsetY);
         
         canvas.dispatchEvent(new CustomEvent('drawing-changed'));
     } 
-    else if (toolPreview != null) {
+    else if (draggingPreview && toolPreview) {
+        toolPreview.x = event.offsetX;
+        toolPreview.y = event.offsetY;
+        canvas.dispatchEvent(new CustomEvent('tool-moved'));
+    }
+    else if (toolPreview) {
         // update tool preview position
         toolPreview.x = event.offsetX;
         toolPreview.y = event.offsetY;
@@ -92,6 +135,7 @@ canvas.addEventListener('mousemove', (event) => {
 // stop
 canvas.addEventListener('mouseup', () => {
     isDrawing = false;
+    draggingPreview = false;
 });
 
 
@@ -103,6 +147,7 @@ document.body.append(clearButton);
 // clear functionality
 clearButton.addEventListener('click', () => {
     lines.length = 0; // clear stored lines
+    stickers.length = 0; // clear stickers
     ctx.clearRect(0, 0, canvas.width, canvas.height); // clear canvas
 });
 
@@ -142,12 +187,6 @@ redoButton.addEventListener('click', () => {
     }
 });
 
-// helper to update button styles
-function updateToolSelection() {
-    thinButton.classList.toggle('selectedTool', selectedTool === 'thin');
-    thickButton.classList.toggle('selectedTool', selectedTool === 'thick');
-}
-
 // Observer for the "drawing-changed" event
 canvas.addEventListener('drawing-changed', () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height); // clear
@@ -155,6 +194,9 @@ canvas.addEventListener('drawing-changed', () => {
     // redraw all lines
     for (const line of lines) {
         line.display(ctx);
+    }
+    for (const sticker of stickers) {
+        sticker.draw(ctx); // Draw all stickers
     }
     if (toolPreview) {
         drawToolPreview()
@@ -164,13 +206,33 @@ canvas.addEventListener('drawing-changed', () => {
 
 // TOOLS //
 
-//create buttons
+// line thickness buttons
 const thinButton = document.createElement('button');
 thinButton.textContent = '.';
 document.body.append(thinButton);
 const thickButton = document.createElement('button');
 thickButton.textContent = 'o';
 document.body.append(thickButton);
+
+// sticker buttons
+const smileyButton = document.createElement('button');
+smileyButton.textContent = '😊';
+document.body.append(smileyButton);
+const heartButton = document.createElement('button');
+heartButton.textContent = '❤️';
+document.body.append(heartButton);
+const starButton = document.createElement('button');
+starButton.textContent = '⭐';
+document.body.append(starButton);
+
+// sticker click functionality
+canvas.addEventListener('click', (event) => {
+    if (selectedTool && selectedTool != 'thin' && selectedTool != 'thick') {
+        const newSticker = new Sticker(selectedTool, event.offsetX - (ctx.measureText(selectedTool).width / 2), event.offsetY + 10);
+        stickers.push(newSticker);
+        canvas.dispatchEvent(new CustomEvent('drawing-changed'));
+    }
+});
 
 // set thin to default
 let selectedTool = 'thin';
@@ -180,11 +242,14 @@ toolPreview = { thickness: lineWidth, x: canvas.width / 4, y: canvas.height / 2 
 // tool button functionality
 thinButton.addEventListener('click', () => setTool('thin'));
 thickButton.addEventListener('click', () => setTool('thick'));
+smileyButton.addEventListener('click', () => setTool('😊'));
+heartButton.addEventListener('click', () => setTool('❤️'));
+starButton.addEventListener('click', () => setTool('⭐'));
 
-function setTool(type: 'thin' | 'thick') {
+function setTool(type: 'thin' | 'thick' | '😊' | '❤️' | '⭐') {
     selectedTool = type;
     // set width
-    switch(type) {
+    switch(selectedTool) {
         case 'thin':
             lineWidth = 2
             break;
@@ -192,11 +257,20 @@ function setTool(type: 'thin' | 'thick') {
             lineWidth = 5
             break;
         default:
-            lineWidth = 2
+            lineWidth = 1 // default are stickers
     }
     updateToolSelection();
     // redraw to show updated preview
     canvas.dispatchEvent(new CustomEvent('drawing-changed'));
+}
+
+// helper to update button styles
+function updateToolSelection() {
+    thinButton.classList.toggle('selectedTool', selectedTool === 'thin');
+    thickButton.classList.toggle('selectedTool', selectedTool === 'thick');
+    smileyButton.classList.toggle('selectedTool', selectedTool === 'sticker-smiley');
+    heartButton.classList.toggle('selectedTool', selectedTool === 'sticker-heart');
+    starButton.classList.toggle('selectedTool', selectedTool === 'sticker-star');
 }
 
 // tool-moved event
@@ -206,16 +280,32 @@ canvas.addEventListener('tool-moved', () => {
     for (const line of lines) {
         line.display(ctx);
     }
+    for (const sticker of stickers) {
+        sticker.draw(ctx);
+    }
     drawToolPreview()
 });
 
 // preview helper function
 function drawToolPreview() {
     if (toolPreview && ctx) {
-        ctx.beginPath();
-        ctx.arc(toolPreview.x, toolPreview.y, toolPreview.thickness / 4, 0, Math.PI * 2);
-        ctx.strokeStyle = 'black';
-        ctx.lineWidth = toolPreview.thickness;
-        ctx.stroke();
+        //if current tool is pen
+        if (selectedTool === 'thin' || selectedTool === 'thick') {
+            ctx.beginPath();
+            ctx.arc(toolPreview.x, toolPreview.y, toolPreview.thickness / 4, 0, Math.PI * 2);
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = toolPreview.thickness;
+            ctx.stroke();
+        }
+        // if current tool is sticker
+        else {
+            ctx.save();
+            ctx.translate(toolPreview.x, toolPreview.y); // move to the preview position
+
+            ctx.font = "30px 'Segoe UI Emoji'";
+            ctx.fillText(selectedTool, -ctx.measureText(selectedTool).width / 2, 10); // center sticker
+            
+            ctx.restore();
+        }
     }
 }
