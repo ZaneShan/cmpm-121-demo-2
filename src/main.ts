@@ -4,7 +4,7 @@ const APP_NAME = "stickerSketchpad";
 const app = document.querySelector<HTMLDivElement>("#app")!;
 
 document.title = APP_NAME;
-app.innerHTML = APP_NAME;
+//app.innerHTML = APP_NAME;
 
 const title = document.createElement('h1');
 title.textContent = 'Sticker Sketchpad';
@@ -160,10 +160,63 @@ canvas.addEventListener('mouseup', () => {
     draggingPreview = false;
 });
 
+const undoContainer = document.createElement('div');
+undoContainer.style.display = 'flex';
+undoContainer.style.gap = '10px';
+undoContainer.style.justifyContent = 'space-between';
+undoContainer.style.padding = '10px';
+document.body.appendChild(undoContainer);
+
+// undo button
+const undoButton = document.createElement('button');
+undoButton.textContent = 'Undo';
+undoContainer.appendChild(undoButton);
+// undo functionality
+undoButton.addEventListener('click', () => {
+    stackPopper(lines, redoLines, canvas);
+});
+
+// undo sticker button
+const undoStickerButton = document.createElement('button');
+undoStickerButton.textContent = 'Undo Sticker';
+undoContainer.appendChild(undoStickerButton);
+// undo functionality
+undoStickerButton.addEventListener('click', () => {
+    stackPopper(stickers, redoStickers, canvas);
+});
+
+const redoContainer = document.createElement('div');
+redoContainer.style.display = 'flex';
+redoContainer.style.gap = '10px';
+redoContainer.style.justifyContent = 'space-between';
+redoContainer.style.padding = '10px';
+document.body.appendChild(redoContainer);
+
+// redo button
+const redoButton = document.createElement('button');
+redoButton.textContent = 'Redo';
+redoContainer.appendChild(redoButton);  
+// redo functionality
+redoButton.addEventListener('click', () => {
+    stackPopper(redoLines, lines, canvas);
+});
+
+// redo sticker button
+const redoStickerButton = document.createElement('button');
+redoStickerButton.textContent = 'Redo Sticker';
+redoContainer.appendChild(redoStickerButton);  
+// redo functionality
+redoStickerButton.addEventListener('click', () => {
+    stackPopper(redoStickers, stickers, canvas);
+});
 
 // clear button
 const clearButton = document.createElement('button');
 clearButton.textContent = 'Clear';
+clearButton.style.display = 'flex';
+clearButton.style.gap = '10px';
+clearButton.style.justifyContent = 'space-between';
+clearButton.style.padding = '10px';
 document.body.append(clearButton);
 // clear functionality
 clearButton.addEventListener('click', () => {
@@ -172,41 +225,6 @@ clearButton.addEventListener('click', () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height); // clear canvas
 });
 
-// undo button
-const undoButton = document.createElement('button');
-undoButton.textContent = 'Undo';
-document.body.appendChild(undoButton);
-// undo functionality
-undoButton.addEventListener('click', () => {
-    stackPopper(lines, redoLines, canvas);
-});
-
-// redo button
-const redoButton = document.createElement('button');
-redoButton.textContent = 'Redo';
-document.body.appendChild(redoButton);  
-// redo functionality
-redoButton.addEventListener('click', () => {
-    stackPopper(redoLines, lines, canvas);
-});
-
-// undo sticker button
-const undoStickerButton = document.createElement('button');
-undoStickerButton.textContent = 'Undo Sticker';
-document.body.appendChild(undoStickerButton);
-// undo functionality
-undoStickerButton.addEventListener('click', () => {
-    stackPopper(stickers, redoStickers, canvas);
-});
-
-// redo sticker button
-const redoStickerButton = document.createElement('button');
-redoStickerButton.textContent = 'Redo Sticker';
-document.body.appendChild(redoStickerButton);  
-// redo functionality
-redoStickerButton.addEventListener('click', () => {
-    stackPopper(redoStickers, stickers, canvas);
-});
 
 // stack popper helper
 function stackPopper(fromStack: any[], toStack: any[], canvas: HTMLCanvasElement) {
@@ -286,9 +304,9 @@ canvas.addEventListener('click', (event) => {
 function setTool(tool: string) {
     selectedTool = tool;
     if (tool === 'thin') {
-        lineWidth = 2;
+        lineWidth = 1;
     } else if (tool === 'thick') {
-        lineWidth = 5;
+        lineWidth = 4;
     } else {
         lineWidth = 1; // Sticker selection
     }
@@ -342,6 +360,13 @@ function drawToolPreview() {
 const exportButton = document.createElement('button');
 exportButton.textContent = 'Export';
 document.body.appendChild(exportButton);
+
+// styling for export
+exportButton.style.position = 'fixed'; // Fixed positioning relative to the viewport
+exportButton.style.bottom = '20px'; // 20px from the bottom of the window
+exportButton.style.right = '20px'; // 20px from the right edge
+exportButton.style.padding = '10px 20px'; // Padding for the button
+exportButton.style.zIndex = '1000'; // Ensure it stays on top of other elements
 
 // export button functionality
 exportButton.addEventListener('click', () => {
