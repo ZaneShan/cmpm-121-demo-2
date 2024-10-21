@@ -338,6 +338,43 @@ function drawToolPreview() {
     }
 }
 
+// export button
+const exportButton = document.createElement('button');
+exportButton.textContent = 'Export';
+document.body.appendChild(exportButton);
+
+// export button functionality
+exportButton.addEventListener('click', () => {
+    // create file name
+    const filename = prompt("Enter filename for your sketch", "sticker_sketch") || "sticker_sketch";
+    const exportCanvas = document.createElement('canvas');
+    exportCanvas.width = 1024; // Export canvas size
+    exportCanvas.height = 1024;
+    const exportCtx = exportCanvas.getContext('2d');
+    // throw error to quell exportCTX is null
+    if (!exportCtx) {  
+        throw new Error('Failed to get the export canvas context!');
+    }
+    exportCtx.scale(4, 4); // scale context
+
+    // redraw existing items (lines and stickers)
+    lines.forEach(line => {
+        line.display(exportCtx);
+    });
+    stickers.forEach(sticker => sticker.draw(exportCtx));
+
+    // trigger download of exported image
+    exportCanvas.toBlob(blob => {
+        if (blob) {
+            const url = URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.download = `${filename}.png`; // set the filename
+            anchor.click(); // click the link to initiate download
+        }
+    }, 'image/png');
+});
+
     // INITIALIZERS //
 
 // set thin to default
