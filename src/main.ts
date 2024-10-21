@@ -1,6 +1,6 @@
 import "./style.css";
 
-const APP_NAME = "Zane Shan";
+const APP_NAME = "stickerSketchpad";
 const app = document.querySelector<HTMLDivElement>("#app")!;
 
 document.title = APP_NAME;
@@ -11,13 +11,17 @@ title.textContent = 'Sticker Sketchpad';
 document.body.append(title);
 
 
-// CANVAS //
+    // CANVAS //
+
+const canvasContainer = document.createElement('div');
+canvasContainer.style.position = 'relative';
+document.body.append(canvasContainer);
 
 const canvas = document.createElement('canvas');
 canvas.width = 256;
 canvas.height = 256;
 canvas.id = "mainCanvas"
-document.body.append(canvas);
+canvasContainer.append(canvas);
 
 // drawing styles
 const ctx = canvas.getContext('2d');
@@ -81,14 +85,31 @@ class Sticker {
     }
 
     drag(ctx: CanvasRenderingContext2D, x: number, y: number) {
-        this.x = x - ctx.measureText(this.emoji).width / 2; // Center horizontally
-        this.y = y + 10; // Adjust vertical position if needed
+        this.x = x - ctx.measureText(this.emoji).width / 2; // center horizontally
+        this.y = y + 10; // adjust vertical position if needed
     }
 }
+const availableStickers = ['😊', '❤️', '⭐']; // initial stickers
 
-const lines: MarkerLine[] = []; // number = array of array of array
-const redoStack: MarkerLine[] = []; // stack for redo operations
-const stickers: Sticker[] = []; // stack for redo operations
+// dynamically create sticker buttons
+function createStickerButtons() {
+    availableStickers.forEach((emoji) => {
+        // check if a button for this emoji already exists
+        if (!document.querySelector(`button.stickerButton[data-emoji="${emoji}"]`)) {
+            const button = document.createElement('button');
+            button.textContent = emoji;
+            button.classList.add('stickerButton');
+            button.setAttribute('data-emoji', emoji); // set a data attribute to track the emoji
+            stickerButtonContainer.append(button);
+            button.addEventListener('click', () => setTool(emoji));
+        }
+    });
+}
+
+const lines: MarkerLine[] = []; // stack for lines
+const redoLines: MarkerLine[] = []; // stack for redo operations
+const stickers: Sticker[] = []; // stack for stickers
+const redoStickers: Sticker[] = []; // stack for redo operations
 let draggingPreview = false;
 
 
@@ -96,7 +117,8 @@ let draggingPreview = false;
 canvas.addEventListener('mousedown', (event) => {
     if (selectedTool === null) return;
     isDrawing = true;
-    redoStack.length = 0; // clear stored lines
+    redoLines.length = 0; // clear stored lines
+    redoStickers.length = 0; // clear stored stickers
 
     if (toolPreview && 
         event.offsetX >= toolPreview.x - (ctx.measureText(selectedTool).width / 2) &&
@@ -143,7 +165,6 @@ canvas.addEventListener('mouseup', () => {
 const clearButton = document.createElement('button');
 clearButton.textContent = 'Clear';
 document.body.append(clearButton);
-
 // clear functionality
 clearButton.addEventListener('click', () => {
     lines.length = 0; // clear stored lines
@@ -155,112 +176,124 @@ clearButton.addEventListener('click', () => {
 const undoButton = document.createElement('button');
 undoButton.textContent = 'Undo';
 document.body.appendChild(undoButton);
-
 // undo functionality
 undoButton.addEventListener('click', () => {
-    if (lines.length > 0) {
-        const lastLine = lines.pop(); // remove the last line
-        if (lastLine) {
-            redoStack.push(lastLine); // add to redo stack
-        }
-        // dispatch drawing-changed event
-        const drawingChangedEvent = new CustomEvent('drawing-changed');
-        canvas.dispatchEvent(drawingChangedEvent);
-    }
+    stackPopper(lines, redoLines, canvas);
 });
 
 // redo button
 const redoButton = document.createElement('button');
 redoButton.textContent = 'Redo';
-document.body.appendChild(redoButton);
-
+document.body.appendChild(redoButton);  
 // redo functionality
 redoButton.addEventListener('click', () => {
-    if (redoStack.length > 0) {
-        const lineToRedo = redoStack.pop(); // get last undone line
-        if (lineToRedo) {
-            lines.push(lineToRedo); // add to lines
-        }
-        // dispatch drawing-changed event
-        const drawingChangedEvent = new CustomEvent('drawing-changed');
-        canvas.dispatchEvent(drawingChangedEvent);
-    }
+    stackPopper(redoLines, lines, canvas);
 });
+
+// undo sticker button
+const undoStickerButton = document.createElement('button');
+undoStickerButton.textContent = 'Undo Sticker';
+document.body.appendChild(undoStickerButton);
+// undo functionality
+undoStickerButton.addEventListener('click', () => {
+    stackPopper(stickers, redoStickers, canvas);
+});
+
+// redo sticker button
+const redoStickerButton = document.createElement('button');
+redoStickerButton.textContent = 'Redo Sticker';
+document.body.appendChild(redoStickerButton);  
+// redo functionality
+redoStickerButton.addEventListener('click', () => {
+    stackPopper(redoStickers, stickers, canvas);
+});
+
+// stack popper helper
+function stackPopper(fromStack: any[], toStack: any[], canvas: HTMLCanvasElement) {
+    if (fromStack.length > 0) {
+        const item = fromStack.pop(); //pop
+        if (item) {
+            toStack.push(item); // push
+        }
+        canvas.dispatchEvent(new CustomEvent('drawing-changed'));
+    }
+}
 
 // Observer for the "drawing-changed" event
 canvas.addEventListener('drawing-changed', () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height); // clear
-
     // redraw all lines
-    for (const line of lines) {
-        line.display(ctx);
-    }
-    for (const sticker of stickers) {
-        sticker.draw(ctx); // Draw all stickers
-    }
-    if (toolPreview) {
-        drawToolPreview()
-    }
+    lines.forEach(line => line.display(ctx));
+    stickers.forEach(sticker => sticker.draw(ctx));
+    drawToolPreview()
 });
 
 
-// TOOLS //
+    // TOOLS //
+
+// tool button container
+const toolButtonContainer = document.createElement('div');
+toolButtonContainer.style.display = 'flex';
+toolButtonContainer.style.justifyContent = 'space-between';
+toolButtonContainer.style.padding = '10px';
+canvasContainer.append(toolButtonContainer);
+
+// sticker button container
+const stickerButtonContainer = document.createElement('div');
+stickerButtonContainer.style.display = 'flex';
+stickerButtonContainer.style.justifyContent = 'space-between';
+stickerButtonContainer.style.padding = '10px';
+canvasContainer.append(stickerButtonContainer);
 
 // line thickness buttons
 const thinButton = document.createElement('button');
 thinButton.textContent = '.';
-document.body.append(thinButton);
+toolButtonContainer.appendChild(thinButton);
+thinButton.addEventListener('click', () => setTool('thin'));
+
 const thickButton = document.createElement('button');
 thickButton.textContent = 'o';
-document.body.append(thickButton);
+toolButtonContainer.appendChild(thickButton);
+thickButton.addEventListener('click', () => setTool('thick'));
 
-// sticker buttons
-const smileyButton = document.createElement('button');
-smileyButton.textContent = '😊';
-document.body.append(smileyButton);
-const heartButton = document.createElement('button');
-heartButton.textContent = '❤️';
-document.body.append(heartButton);
-const starButton = document.createElement('button');
-starButton.textContent = '⭐';
-document.body.append(starButton);
+// Custom Sticker Button
+const customStickerButton = document.createElement('button');
+customStickerButton.textContent = 'Add Custom Sticker';
+toolButtonContainer.append(customStickerButton);
 
-// sticker click functionality
-canvas.addEventListener('click', (event) => {
-    if (selectedTool && selectedTool != 'thin' && selectedTool != 'thick') {
-        const newSticker = new Sticker(selectedTool, event.offsetX - (ctx.measureText(selectedTool).width / 2), event.offsetY + 10);
-        stickers.push(newSticker);
-        canvas.dispatchEvent(new CustomEvent('drawing-changed'));
+customStickerButton.addEventListener('click', () => {
+    const customEmoji = prompt("Enter custom sticker emoji", "😀");
+    if (customEmoji) {
+        availableStickers.push(customEmoji); // Add new sticker to availableStickers
+        createStickerButtons(); // Regenerate buttons
+        setTool(customEmoji); // Select the new sticker
     }
 });
 
-// set thin to default
-let selectedTool = 'thin';
-thinButton.classList.add('selectedTool');
-toolPreview = { thickness: lineWidth, x: canvas.width / 4, y: canvas.height / 2 };
-
-// tool button functionality
-thinButton.addEventListener('click', () => setTool('thin'));
-thickButton.addEventListener('click', () => setTool('thick'));
-smileyButton.addEventListener('click', () => setTool('😊'));
-heartButton.addEventListener('click', () => setTool('❤️'));
-starButton.addEventListener('click', () => setTool('⭐'));
-
-function setTool(type: 'thin' | 'thick' | '😊' | '❤️' | '⭐') {
-    selectedTool = type;
-    // set width
-    switch(selectedTool) {
-        case 'thin':
-            lineWidth = 2
-            break;
-        case 'thick':
-            lineWidth = 5
-            break;
-        default:
-            lineWidth = 1 // default are stickers
+canvas.addEventListener('click', (event) => {
+    if (selectedTool && selectedTool !== 'thin' && selectedTool !== 'thick') {
+        // Create a new sticker and place it on the canvas
+        const newSticker = new Sticker(
+            selectedTool,
+            event.offsetX - (ctx.measureText(selectedTool).width / 2),
+            event.offsetY + 10
+        );
+        stickers.push(newSticker); // Add the sticker to the array
+        canvas.dispatchEvent(new CustomEvent('drawing-changed')); // Trigger a redraw
     }
+});
+
+function setTool(tool: string) {
+    selectedTool = tool;
+    if (tool === 'thin') {
+        lineWidth = 2;
+    } else if (tool === 'thick') {
+        lineWidth = 5;
+    } else {
+        lineWidth = 1; // Sticker selection
+    }
+    toolPreview = { thickness: lineWidth, x: canvas.width / 2, y: canvas.height / 2 }; // Set preview for tool
     updateToolSelection();
-    // redraw to show updated preview
     canvas.dispatchEvent(new CustomEvent('drawing-changed'));
 }
 
@@ -268,9 +301,10 @@ function setTool(type: 'thin' | 'thick' | '😊' | '❤️' | '⭐') {
 function updateToolSelection() {
     thinButton.classList.toggle('selectedTool', selectedTool === 'thin');
     thickButton.classList.toggle('selectedTool', selectedTool === 'thick');
-    smileyButton.classList.toggle('selectedTool', selectedTool === 'sticker-smiley');
-    heartButton.classList.toggle('selectedTool', selectedTool === 'sticker-heart');
-    starButton.classList.toggle('selectedTool', selectedTool === 'sticker-star');
+    document.querySelectorAll('.stickerButton').forEach((button) => {
+        const emoji = button.textContent;
+        button.classList.toggle('selectedTool', selectedTool === emoji);
+    });
 }
 
 // tool-moved event
@@ -288,24 +322,27 @@ canvas.addEventListener('tool-moved', () => {
 
 // preview helper function
 function drawToolPreview() {
-    if (toolPreview && ctx) {
-        //if current tool is pen
+    if (toolPreview && selectedTool && ctx != null) {
         if (selectedTool === 'thin' || selectedTool === 'thick') {
             ctx.beginPath();
-            ctx.arc(toolPreview.x, toolPreview.y, toolPreview.thickness / 4, 0, Math.PI * 2);
+            ctx.arc(toolPreview.x, toolPreview.y, toolPreview.thickness / 2, 0, Math.PI * 2);
             ctx.strokeStyle = 'black';
             ctx.lineWidth = toolPreview.thickness;
             ctx.stroke();
-        }
-        // if current tool is sticker
+        } 
+        // selected tool is sticker
         else {
-            ctx.save();
-            ctx.translate(toolPreview.x, toolPreview.y); // move to the preview position
-
             ctx.font = "30px 'Segoe UI Emoji'";
-            ctx.fillText(selectedTool, -ctx.measureText(selectedTool).width / 2, 10); // center sticker
-            
-            ctx.restore();
+            ctx.fillText(selectedTool, toolPreview.x - ctx.measureText(selectedTool).width / 2, toolPreview.y + 10);
         }
     }
 }
+
+    // INITIALIZERS //
+
+// set thin to default
+let selectedTool = 'thin';
+thinButton.classList.add('selectedTool');
+toolPreview = { thickness: lineWidth, x: canvas.width / 4, y: canvas.height / 2 };
+
+createStickerButtons()
