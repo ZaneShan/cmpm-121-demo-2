@@ -1,7 +1,7 @@
 import "./style.css";
 
 const APP_NAME = "stickerSketchpad";
-const app = document.querySelector<HTMLDivElement>("#app")!;
+//const app = document.querySelector<HTMLDivElement>("#app")!;
 
 document.title = APP_NAME;
 //app.innerHTML = APP_NAME;
@@ -23,15 +23,13 @@ canvas.height = 256;
 canvas.id = "mainCanvas"
 canvasContainer.append(canvas);
 
-// drawing styles
+// get context
 const ctx = canvas.getContext('2d');
 // ctx check to quell null error
 if (!ctx) {
     throw new Error('Failed to get the canvas context!');
 }
 
-let isDrawing = false; // check mousedown variable
-let lineWidth = 2; // default line width
 type ToolPreview = {
     thickness: number;
     x: number;
@@ -42,10 +40,12 @@ let toolPreview: ToolPreview | null = null;
 class MarkerLine {
     points: { x: number; y: number }[];
     thickness: number;
+    color: string;
 
-    constructor(x1: number, y1: number, thickness: number) {
+    constructor(x1: number, y1: number, thickness: number, color: string) {
         this.points = [{ x: x1, y: y1 }]; // initial marker position
         this.thickness = thickness; // set thickness
+        this.color = color;
     }
 
     drag(x: number, y: number): void {
@@ -59,14 +59,55 @@ class MarkerLine {
             ctx.lineTo(point.x, point.y);
         }
 
-        // STYLE //
-        ctx.strokeStyle = 'black';
-        ctx.lineWidth = this.thickness; // current thickness
-        //       //
-
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = this.thickness;
         ctx.stroke();
     }
 }
+
+// color palette buttons
+const colors = ['black', 'red', 'green', 'blue', 'purple'];
+let selectedColor = 'black'; // default
+
+const colorContainer = document.createElement('div');
+colorContainer.style.display = 'flex'; // arrange colors side by side
+colorContainer.style.gap = '10px'; // add spacing
+
+colors.forEach(color => {
+    const colorButton = document.createElement('button');
+    colorButton.style.backgroundColor = color;
+    colorButton.style.width = '30px';
+    colorButton.style.height = '30px';
+    colorButton.addEventListener('click', () => setColor(color));
+    colorContainer.appendChild(colorButton);
+});
+document.body.appendChild(colorContainer);
+
+// set color helper
+function setColor(color: string) {
+    selectedColor = color;
+}
+
+// create slider
+const slider = document.createElement('input');
+slider.type = 'range';
+slider.min = '0';
+slider.max = '360';
+slider.value = '0';
+slider.style.width = '200px'; // width of slider
+document.body.appendChild(slider);
+
+// label for slider
+const sliderLabel = document.createElement('label');
+sliderLabel.textContent = 'Adjust color hue:';
+document.body.appendChild(sliderLabel);
+let sliderValue = 0;
+
+slider.addEventListener('input', (event) => {
+    sliderValue = parseInt(slider.value);
+    const hue = sliderValue;
+    selectedColor = `hsl(${hue}, 100%, 50%)`; // set the marker color using hue
+});
 
 class Sticker {
     emoji: string;
@@ -106,6 +147,8 @@ function createStickerButtons() {
     });
 }
 
+let isDrawing = false; // check mousedown variable
+let lineWidth = 2; // default line width
 const lines: MarkerLine[] = []; // stack for lines
 const redoLines: MarkerLine[] = []; // stack for redo operations
 const stickers: Sticker[] = []; // stack for stickers
@@ -130,7 +173,7 @@ canvas.addEventListener('mousedown', (event) => {
     }
 
     if (selectedTool === 'thin' || selectedTool === 'thick') {
-        const newLine = new MarkerLine(event.offsetX, event.offsetY, lineWidth);
+        const newLine = new MarkerLine(event.offsetX, event.offsetY, lineWidth, selectedColor); // Use selected color
         lines.push(newLine);
     }
 });
@@ -145,13 +188,13 @@ canvas.addEventListener('mousemove', (event) => {
     else if (draggingPreview && toolPreview) {
         toolPreview.x = event.offsetX;
         toolPreview.y = event.offsetY;
-        canvas.dispatchEvent(new CustomEvent('tool-moved'));
+        canvas.dispatchEvent(new CustomEvent('drawing-changed'));
     }
     else if (toolPreview) {
         // update tool preview position
         toolPreview.x = event.offsetX;
         toolPreview.y = event.offsetY;
-        canvas.dispatchEvent(new CustomEvent('tool-moved'));
+        canvas.dispatchEvent(new CustomEvent('drawing-changed'));
     }
 });
 // stop
@@ -325,26 +368,13 @@ function updateToolSelection() {
     });
 }
 
-// tool-moved event
-canvas.addEventListener('tool-moved', () => {
-    // redraw tool preview
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    for (const line of lines) {
-        line.display(ctx);
-    }
-    for (const sticker of stickers) {
-        sticker.draw(ctx);
-    }
-    drawToolPreview()
-});
-
 // preview helper function
 function drawToolPreview() {
     if (toolPreview && selectedTool && ctx != null) {
         if (selectedTool === 'thin' || selectedTool === 'thick') {
             ctx.beginPath();
             ctx.arc(toolPreview.x, toolPreview.y, toolPreview.thickness / 2, 0, Math.PI * 2);
-            ctx.strokeStyle = 'black';
+            ctx.strokeStyle = selectedColor;
             ctx.lineWidth = toolPreview.thickness;
             ctx.stroke();
         } 
