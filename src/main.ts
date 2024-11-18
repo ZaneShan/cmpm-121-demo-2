@@ -7,6 +7,7 @@ document.title = APP_NAME;
 const title = document.createElement('h1');
 title.textContent = 'Sticker Sketchpad';
 document.body.append(title);
+title.classList.add('heartbeat');
 
 
     // CANVAS //
